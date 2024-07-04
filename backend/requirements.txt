@@ -1,2 +1,4 @@
 Flask
 torch
+flask-cors
+pytube

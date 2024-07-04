@@ -15,14 +15,19 @@ const Transcription = () => {
     if (audioFile) {
       const formData = new FormData();
       formData.append('audio', audioFile);
-      console.log("jwtAxios", jwtAxios);
-      const response = await jwtAxios.post('/transcribe', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      setTranscription(response.data.transcription);
+      try {
+        const response = await jwtAxios.post('/transcribe', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        if (response?.data){
+          setTranscription(response.data.transcription);
+        }
+      } catch (error) {
+        console.log("error: ", error);
+      }
+      
     }
   };
 
