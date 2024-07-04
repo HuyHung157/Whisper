@@ -1,4 +1,7 @@
 Flask
-torch
+flask
 flask-cors
+numpy
+torch
 pytube
+git+https://github.com/openai/whisper.git

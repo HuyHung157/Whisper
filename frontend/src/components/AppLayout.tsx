@@ -5,7 +5,9 @@ import Navbar from "./Navbar";
 const AppLayout = () => (
   <>
     <Navbar/>
-    <Outlet />
+    <div className='p-5'>
+      <Outlet />
+    </div>
   </>
 );
 

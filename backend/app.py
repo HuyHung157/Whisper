@@ -7,7 +7,12 @@ import os
 import pytube as pt
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"])
+# CORS(app, 
+#      origins=["http://localhost:3000"], 
+#      methods=["POST"]
+# )
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+
 model = whisper.load_model("large-v3")
 
 @app.route('/')

@@ -1,11 +1,11 @@
 import React from 'react';
 import { createBrowserRouter } from "react-router-dom";
-import SpeechToText from "./components/SpeechToText";
-import Translation from "./components/Translation";
-import Transcription from "./components/Transcription";
-import LanguageDetection from "./components/LanguageDetection";
-import TextToSpeech from "./components/TextToSpeech";
-import Settings from "./components/Settings";
+import SpeechToText from "./pages/SpeechToText";
+import Translation from "./pages/Translation";
+import Transcription from "./pages/Transcription";
+import LanguageDetection from "./pages/LanguageDetection";
+import TextToSpeech from "./pages/TextToSpeech";
+import Settings from "./pages/Settings";
 import AppLayout from "./components/AppLayout";
 
 export const router = createBrowserRouter([
