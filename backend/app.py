@@ -11,45 +11,39 @@ app = Flask(__name__)
 #      origins=["http://localhost:3000"], 
 #      methods=["POST"]
 # )
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}})
 
-model = whisper.load_model("large-v3")
+# model = whisper.load_model("large-v3", "cpu")
+model = whisper.load_model("base")
 
 @app.route('/')
 def home():
     return "Whisper Demo Backend"
 
 @app.route('/transcribe', methods=['POST'])
-def transcribe(isYoutube):
+def transcribe():
     audio_file = request.files['audio']
     try:
-        if (isYoutube):
-          # download mp3 from youtube video (Breaking Italy)
-          yt = pt.YouTube("https://www.youtube.com/watch?v=4KI9BBW_aP8")
-          stream = yt.streams.filter(only_audio=True)[0]
-          stream.download(filename="audio_italian.mp3")
-          result = model.transcribe("audio_italian.mp3")
-          transcription = result["text"]
-        else:
-          with tempfile.NamedTemporaryFile(delete=False) as temp_audio_file:
-              audio_file.save(temp_audio_file)
-              temp_audio_file_path = temp_audio_file.name
-          result = model.transcribe(temp_audio_file_path)
-          transcription = result["text"]
-          os.remove(temp_audio_file_path)  # Clean up the temporary file
-
+        with tempfile.NamedTemporaryFile(delete=False) as temp_audio_file:
+            audio_file.save(temp_audio_file)
+            temp_audio_file_path = temp_audio_file.name
+        result = model.transcribe(temp_audio_file_path)
+        transcription = result["text"]
+        os.remove(temp_audio_file_path)  # Clean up the temporary file
         return jsonify({'transcription': transcription})
     except Exception as ex:
         print(f"Exception - transcription: {ex}")
         return jsonify({'error': 'An error occurred during transcription'}), 500
 
-@app.route('/translate', methods=['POST'])
+@app.route('/transcript-youtube', methods=['POST'])
 def translate():
   try:
-      text = request.json['text']
-      target_lang = request.json['target_lang']
-      translation = model.transcribe(text, language=target_lang)
-      return jsonify({'translation': translation})
+      # download mp3 from youtube video (Breaking Italy)
+        yt = pt.YouTube("https://www.youtube.com/watch?v=4KI9BBW_aP8")
+        stream = yt.streams.filter(only_audio=True)[0]
+        stream.download(filename="audio_italian.mp3")
+        result = model.transcribe("audio_italian.mp3")
+        transcription = result["text"]
   except Exception as ex:
       print(f"Exception - translate: {ex}")
       return jsonify({'error': 'An error occurred during translate'}), 500

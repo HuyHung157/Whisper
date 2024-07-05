@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { apiUrl } from '../../constants/AppConst';
 
-console.log("a", apiUrl);
 const jwtAxios = axios.create({
   baseURL: apiUrl,
   headers: {

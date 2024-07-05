@@ -1,11 +1,8 @@
 import React from 'react';
 import { createBrowserRouter } from "react-router-dom";
 import SpeechToText from "./pages/SpeechToText";
-import Translation from "./pages/Translation";
-import Transcription from "./pages/Transcription";
 import LanguageDetection from "./pages/LanguageDetection";
 import TextToSpeech from "./pages/TextToSpeech";
-import Settings from "./pages/Settings";
 import AppLayout from "./components/AppLayout";
 
 export const router = createBrowserRouter([
@@ -15,15 +12,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <Transcription />,
-      },
-      {
-        path: "transcription",
-        element: <Transcription />,
-      },
-      {
-        path: "translation",
-        element: <Translation />,
+        element: <SpeechToText />,
       },
       {
         path: "speech-to-text",
@@ -36,10 +25,6 @@ export const router = createBrowserRouter([
       {
         path: "detect-language",
         element: <LanguageDetection />,
-      },
-      {
-        path: "settings",
-        element: <Settings />,
       },
     ],
   },
