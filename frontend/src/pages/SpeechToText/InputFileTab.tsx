@@ -8,21 +8,28 @@ import { Col, Row } from "antd";
 import TypingAnimation from "../../components/TypingAnimation";
 import jwtAxios from "../../services/jwt-auth";
 import OptionTask from "../../components/OptionTask";
+import { ACTION_TASK } from "../../constants/AppEnum";
 
 const { Dragger } = Upload;
 
 const InputFileTab = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [transcription, setTranscription] = useState("");
-
-  const onChangeTask = (value: any) => {
-    console.log('radio checked', value);
-  };
+  const [translate, setTranslate] = useState("");
+  const [languageTranslate, onChangeLanguageTranslate] = useState("en");
+  const [isLoading, setIsLoading] = useState(false);
+  const [actionTask, setActionTask] = useState<ACTION_TASK>(
+    ACTION_TASK.TRANSCRIBE
+  );
 
   const handleSubmit = async () => {
     if (audioFile) {
+      setIsLoading(true);
+      setTranscription("");
       const formData = new FormData();
       formData.append("audio", audioFile);
+      actionTask === ACTION_TASK.TRANSLATE &&
+        formData.append("targetLanguage", languageTranslate);
       try {
         const response = await jwtAxios.post("/transcribe", formData, {
           headers: {
@@ -31,9 +38,12 @@ const InputFileTab = () => {
         });
         if (response?.data) {
           setTranscription(response.data.transcription);
+          response?.data?.translate && setTranslate(response.data.translate);
         }
       } catch (error) {
         console.log("error: ", error);
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -46,11 +56,14 @@ const InputFileTab = () => {
             <div style={{ padding: "20px", maxWidth: "400px" }}>
               <Dragger
                 beforeUpload={(file) => {
+                  console.log("file: ", file);
                   setAudioFile(file);
                   return false;
                 }}
                 accept={"audio/*"}
                 style={{ padding: "20px" }}
+                multiple={false}
+                maxCount={1}
               >
                 <p className="ant-upload-drag-icon">
                   <InboxOutlined />
@@ -66,9 +79,11 @@ const InputFileTab = () => {
                     </p> */}
               </Dragger>
             </div>
-            
           </Card>
-          <OptionTask onChangeTask={onChangeTask} />
+          <OptionTask
+            onChangeOption={onChangeLanguageTranslate}
+            onChangeTask={setActionTask}
+          />
           <Card>
             <Button type="primary" onClick={handleSubmit}>
               Submit
@@ -79,7 +94,18 @@ const InputFileTab = () => {
         <Col flex={6}>
           <Card>
             Output:
-            <TypingAnimation message={transcription} />
+            {actionTask === ACTION_TASK.TRANSLATE && (
+              <>
+                <br /> Transcribe:
+              </>
+            )}
+            <TypingAnimation isLoading={isLoading} message={transcription} />
+            {actionTask === ACTION_TASK.TRANSLATE && (
+              <>
+                Translate:
+                <TypingAnimation isLoading={isLoading} message={translate} />
+              </>
+            )}
           </Card>
         </Col>
       </Row>

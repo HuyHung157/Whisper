@@ -7,64 +7,84 @@ import os
 import pytube as pt
 
 app = Flask(__name__)
-# CORS(app, 
-#      origins=["http://localhost:3000"], 
+# CORS(app,
+#      origins=["http://localhost:3000"],
 #      methods=["POST"]
 # )
-CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}})
+CORS(
+    app,
+    resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}},
+)
 
 # model = whisper.load_model("large-v3", "cpu")
-model = whisper.load_model("base")
+model = whisper.load_model("large")
+# model = whisper.load_model("medium")
+# model = whisper.load_model("base")
 
-@app.route('/')
+
+@app.route("/")
 def home():
     return "Whisper Demo Backend"
 
-@app.route('/transcribe', methods=['POST'])
+
+@app.route("/transcribe", methods=["POST"])
 def transcribe():
-    audio_file = request.files['audio']
+    audio_file = request.files["audio"]
+    target_language = request.form.get('targetLanguage', '')
     try:
         with tempfile.NamedTemporaryFile(delete=False) as temp_audio_file:
             audio_file.save(temp_audio_file)
             temp_audio_file_path = temp_audio_file.name
-        result = model.transcribe(temp_audio_file_path)
-        transcription = result["text"]
-        os.remove(temp_audio_file_path)  # Clean up the temporary file
-        return jsonify({'transcription': transcription})
+            result = model.transcribe(temp_audio_file_path)
+        if target_language:
+            output = model.transcribe(temp_audio_file_path, language=target_language)
+            translate = output["text"]
+            transcription = result["text"]
+            os.remove(temp_audio_file_path)
+            return jsonify({"transcription": transcription, "translate": translate})
+        else:
+            transcription = result["text"]
+            os.remove(temp_audio_file_path)
+            return jsonify({"transcription": transcription})
     except Exception as ex:
         print(f"Exception - transcription: {ex}")
-        return jsonify({'error': 'An error occurred during transcription'}), 500
+        return jsonify({"error": "An error occurred during transcription"}), 500
 
-@app.route('/transcript-youtube', methods=['POST'])
+
+@app.route("/transcript-youtube", methods=["POST"])
 def translate():
-  try:
-      # download mp3 from youtube video (Breaking Italy)
+    try:
+        # download mp3 from youtube video (Breaking Italy)
         yt = pt.YouTube("https://www.youtube.com/watch?v=4KI9BBW_aP8")
         stream = yt.streams.filter(only_audio=True)[0]
         stream.download(filename="audio_italian.mp3")
         result = model.transcribe("audio_italian.mp3")
         transcription = result["text"]
-  except Exception as ex:
-      print(f"Exception - translate: {ex}")
-      return jsonify({'error': 'An error occurred during translate'}), 500
+    except Exception as ex:
+        print(f"Exception - translate: {ex}")
+        return jsonify({"error": "An error occurred during translate"}), 500
 
-@app.route('/speech_to_text', methods=['POST'])
+
+@app.route("/speech_to_text", methods=["POST"])
 def speech_to_text():
-    audio_file = request.files['audio']
+    audio_file = request.files["audio"]
     transcription = model.speech_to_text(audio_file)
-    return jsonify({'transcription': transcription})
+    return jsonify({"transcription": transcription})
 
-@app.route('/text_to_speech', methods=['POST'])
+
+@app.route("/text_to_speech", methods=["POST"])
 def text_to_speech():
-    text = request.json['text']
+    text = request.json["text"]
     audio = model.text_to_speech(text)
-    return jsonify({'audio': audio})
+    return jsonify({"audio": audio})
 
-@app.route('/detect_language', methods=['POST'])
+
+@app.route("/detect_language", methods=["POST"])
 def detect_language():
-    text = request.json['text']
+    text = request.json["text"]
     language = model.detect_language(text)
-    return jsonify({'language': language})
+    return jsonify({"language": language})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app.run(debug=True)

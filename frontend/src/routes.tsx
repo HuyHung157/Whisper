@@ -4,6 +4,7 @@ import SpeechToText from "./pages/SpeechToText";
 import LanguageDetection from "./pages/LanguageDetection";
 import TextToSpeech from "./pages/TextToSpeech";
 import AppLayout from "./components/AppLayout";
+import NotFound from './pages/NotFound';
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
       {
         path: "detect-language",
         element: <LanguageDetection />,
+      },
+      {
+        path: "*",
+        element: <NotFound/>,
       },
     ],
   },

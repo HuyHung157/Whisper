@@ -1,0 +1,44 @@
+/* Navbar.css */
+.App-header {
+  height: unset;
+  max-width: 1024px;
+  background-color: transparent;
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+.navbar {
+  background-color: #333;
+  overflow: hidden;
+}
+
+.navbar-nav {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+}
+
+.navbar-nav li {
+  display: flex;
+}
+
+.navbar-nav li a {
+  color: black;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+}
+
+.navbar-nav li:not(.active) a:hover {
+  background-color: #ececec;
+  color: black;
+}
+
+.navbar-nav .active a {
+  background-color: #40a9ff;
+  color: white;
+}

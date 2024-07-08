@@ -22,7 +22,7 @@ const Transcription = () => {
 
   return (
     <div className="pt-2 app__container">
-      <h2>Transcription</h2>
+      <h2>Speech To Text</h2>
       <Tabs defaultActiveKey="1" type="card" size="large">
         <TabPane tab="Audio file" key="1">
           <InputFileTab />

@@ -14,6 +14,7 @@ const RecordFileTab = () => {
   const [transcription, setTranscription] = useState("");
   const [audioBlob, setAudioBlob] = useState<any>(null);
   const [audioURL, setAudioURL] = useState("");
+  const [languageTranslate, onChangeLanguageTranslate] = useState("en");
   const [recordMode, setRecordMode] = useState<RECORD_MODE>(
     RECORD_MODE.DEFAULT
   );
@@ -34,19 +35,23 @@ const RecordFileTab = () => {
 
   const startRecording = async () => {
     try {
+      let chunks: any[] = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       mediaRecorderRef.current.ondataavailable = (event: BlobEvent) => {
+        console.log("event:: ", event);
+        chunks.push(event.data);
         audioChunksRef.current.push(event.data);
       };
       mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(chunks, { 'type': 'audio/ogg; codecs=opus' });
+        console.log("blob: ", blob);
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/wav",
         });
         const url = URL.createObjectURL(audioBlob);
         setAudioBlob(audioBlob);
         console.log("audioBlob: ", audioBlob);
-        
         setAudioURL(url);
         audioChunksRef.current = [];
       };
@@ -104,23 +109,24 @@ const RecordFileTab = () => {
               </Button>
             )}
             {recordMode === RECORD_MODE.STOP && (
-              <>
-                <Button
-                  onClick={() => handleChangeRecordMode(RECORD_MODE.DEFAULT)}
-                >
-                  X
-                </Button>
-
+              <div className="flex align-middle">
                 {!audioURL && <audio controls src={""}></audio>}
                 {audioURL && (
                   <audio controls>
                     <source src={audioURL} type="audio/wav" />
                   </audio>
                 )}
-              </>
+
+                <Button
+                  className="ml-2"
+                  onClick={() => handleChangeRecordMode(RECORD_MODE.DEFAULT)}
+                >
+                  X
+                </Button>
+              </div>
             )}
           </Card>
-          <OptionTask onChangeTask={onChangeTask} />
+          <OptionTask onChangeOption={onChangeLanguageTranslate} onChangeTask={onChangeTask} />
           <Card>
             <Button type="primary" onClick={handleSubmit}>
               Submit
