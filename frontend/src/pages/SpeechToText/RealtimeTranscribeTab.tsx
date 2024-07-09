@@ -22,13 +22,10 @@ const RealtimeTranscribeTab = () => {
   const [transcription, setTranscription] = useState("");
   const [languageTranslate, onChangeLanguageTranslate] = useState("en");
 
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null
-  );
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
-  const [recordMode, setRecordMode] = useState<RECORD_MODE>(
-    RECORD_MODE.STOP
-  );
+  const [recordMode, setRecordMode] = useState<RECORD_MODE>(RECORD_MODE.STOP);
   const [actionTask, setActionTask] = useState<ACTION_TASK>(
     ACTION_TASK.TRANSCRIBE
   );
@@ -59,23 +56,45 @@ const RealtimeTranscribeTab = () => {
       startRecording();
     }
     if (recordMode === RECORD_MODE.STOP) {
-      mediaRecorder && mediaRecorder.stop();
+      mediaRecorderRef.current && mediaRecorderRef.current.stop();
     }
   };
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          socket.emit("audio_stream", event.data);
-        }
-      };
-      recorder.start(250); // Send audio data every 250ms
-      setMediaRecorder(recorder);
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          const mediaRecorder = new MediaRecorder(stream);
+          mediaRecorderRef.current = mediaRecorder;
+          audioChunksRef.current = [];
+
+          mediaRecorder.ondataavailable = (event: BlobEvent) => {
+            audioChunksRef.current.push(event.data);
+            if (mediaRecorder.state === "recording") {
+              mediaRecorder.requestData();
+            }
+          };
+
+          mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunksRef.current, {
+              type: "audio/wav",
+            });
+            audioChunksRef.current = [];
+            const reader = new FileReader();
+            reader.onload = () => {
+              const buffer = reader.result;
+              socket.emit("audio_stream", buffer);
+            };
+            reader.readAsArrayBuffer(audioBlob);
+          };
+          mediaRecorder.start();
+        })
+        .catch((error) => {
+          console.error("Error accessing media devices.", error);
+        });
     } catch (err) {
-      console.error("Error accessing microphone: ", err);
+      console.error("Something wrong: ", err);
     }
   };
 

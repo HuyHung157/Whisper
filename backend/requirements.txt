@@ -7,4 +7,15 @@ torch
 yt-dlp
 librosa
 ffmpeg-python==0.2.0
+
+# For GPU
 git+https://github.com/openai/whisper.git
+
+# For Macbook M1
+# git+https://github.com/ggerganov/whisper.cpp.git
+
+# For faster
+# https://github.com/SYSTRAN/faster-whisper.git
+
+# Add a line to run the setup.sh script
+# -e ./setup.sh

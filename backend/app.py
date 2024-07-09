@@ -25,7 +25,7 @@ socketio = SocketIO(app, cors_allowed_origins="http://localhost:3000")
 # model = whisper.load_model("large")
 # model = whisper.load_model("medium")
 model = whisper.load_model("base")
-audio_buffer = b""
+audio_buffer = []
 
 
 @app.route("/")
@@ -163,49 +163,37 @@ def handle_connect():
 def handle_disconnect():
     print("Client disconnected")
 
-
 @socketio.on("audio_stream")
 def handle_audio_stream(data):
     global audio_buffer
-    audio_buffer += data
+    # Convert the received data into a numpy array of int16
+    audio_data = np.frombuffer(data, dtype=np.int16)
+    # Normalize the audio data to float32 and store in audio_buffer
+    audio_buffer.extend(audio_data.astype(np.float32) / 32768.0)
+    
+    # Process every second of audio (16000 samples at 16kHz)
+    if len(audio_buffer) >= 16000:
+        audio_data = np.array(audio_buffer[:16000])
+        audio_buffer = audio_buffer[16000:]
+        transcription = transcribe_audio_data(audio_data)
+        emit('transcription_result', {'text': transcription})
 
-    # Define the element size for int16
-    element_size = np.dtype(np.int16).itemsize
-
-    # Check if the buffer has enough data for at least one element
-    if len(audio_buffer) >= element_size:
-        # Ensure buffer size is a multiple of element size
-        num_elements = len(audio_buffer) // element_size
-        buffer_size = num_elements * element_size
-
-        # Extract the data that fits the buffer size
-        audio_data = (
-            np.frombuffer(audio_buffer[:buffer_size], dtype=np.int16).astype(np.float32)
-            / 32768.0
-        )
-
-        # Keep the remaining data in the buffer
-        audio_buffer = audio_buffer[buffer_size:]
-
-        # Process the audio data
-        mel = log_mel_spectrogram(audio_data)
-        if mel.ndim == 2:  # Check if mel is 2-dimensional
-            mel_tensor = torch.from_numpy(mel).unsqueeze(
-                0
-            )  # Convert to tensor and add batch dimension
-        else:
-            mel_tensor = torch.from_numpy(mel)
-        result = model.decode(mel_tensor)
-        emit("transcription_result", {"text": result["text"]})
-
+def transcribe_audio_data(audio_data):
+    mel = log_mel_spectrogram(audio_data)
+    mel_tensor = torch.from_numpy(mel).unsqueeze(0)
+    result = model.decode(mel_tensor)
+    return result['text']
 
 def log_mel_spectrogram(audio_data, sr=16000, n_mels=80, n_fft=400, hop_length=160):
     mel_spectrogram = librosa.feature.melspectrogram(
-        y=audio_data, sr=sr, n_mels=n_mels, n_fft=n_fft, hop_length=hop_length
+        y=audio_data, 
+        sr=sr, 
+        n_mels=n_mels, 
+        n_fft=n_fft, 
+        hop_length=hop_length
     )
     log_mel_spectrogram = librosa.power_to_db(mel_spectrogram, ref=np.max)
     return log_mel_spectrogram
-
 
 if __name__ == "__main__":
     # app.run(debug=True)
