@@ -1,23 +1,22 @@
 import React, { useState } from "react";
-import PropTypes from "prop-types";
-import { Button, Card, Radio, RadioChangeEvent } from "antd";
-import { Upload } from "antd";
+import { Button, Card, Col, message, Row, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
-import "antd/dist/reset.css";
-import { Col, Row } from "antd";
+import { BsFileEarmarkMusic } from "react-icons/bs";
 import TypingAnimation from "../../components/TypingAnimation";
 import jwtAxios from "../../services/jwt-auth";
 import OptionTask from "../../components/OptionTask";
 import { ACTION_TASK } from "../../constants/AppEnum";
+import CustomCard from "../../components/CustomCard";
+import "antd/dist/reset.css";
 
 const { Dragger } = Upload;
 
 const InputFileTab = () => {
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [transcription, setTranscription] = useState("");
-  const [translate, setTranslate] = useState("");
-  const [languageTranslate, onChangeLanguageTranslate] = useState("en");
   const [isLoading, setIsLoading] = useState(false);
+  const [translate, setTranslate] = useState("");
+  const [transcription, setTranscription] = useState("");
+  const [languageTranslate, onChangeLanguageTranslate] = useState("en");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [actionTask, setActionTask] = useState<ACTION_TASK>(
     ACTION_TASK.TRANSCRIBE
   );
@@ -40,8 +39,9 @@ const InputFileTab = () => {
           setTranscription(response.data.transcription);
           response?.data?.translate && setTranslate(response.data.translate);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log("error: ", error);
+        message.error(error?.message || "Something went wrong");
       } finally {
         setIsLoading(false);
       }
@@ -52,7 +52,7 @@ const InputFileTab = () => {
     <>
       <Row gutter={24}>
         <Col flex={6}>
-          <Card>
+          <CustomCard icon={<BsFileEarmarkMusic size={18} />} label="Input">
             <div style={{ padding: "20px", maxWidth: "400px" }}>
               <Dragger
                 beforeUpload={(file) => {
@@ -79,7 +79,8 @@ const InputFileTab = () => {
                     </p> */}
               </Dragger>
             </div>
-          </Card>
+          </CustomCard>
+
           <OptionTask
             onChangeOption={onChangeLanguageTranslate}
             onChangeTask={setActionTask}
@@ -92,13 +93,8 @@ const InputFileTab = () => {
         </Col>
 
         <Col flex={6}>
-          <Card>
-            Output:
-            {actionTask === ACTION_TASK.TRANSLATE && (
-              <>
-                <br /> Transcribe:
-              </>
-            )}
+        <CustomCard label="Output:">
+            Transcribe:
             <TypingAnimation isLoading={isLoading} message={transcription} />
             {actionTask === ACTION_TASK.TRANSLATE && (
               <>
@@ -106,7 +102,7 @@ const InputFileTab = () => {
                 <TypingAnimation isLoading={isLoading} message={translate} />
               </>
             )}
-          </Card>
+          </CustomCard>
         </Col>
       </Row>
     </>

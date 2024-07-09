@@ -1,25 +1,30 @@
 import React, { useRef, useState } from "react";
-import PropTypes from "prop-types";
-import { Button, Card } from "antd";
-
+import { Button, Card, message } from "antd";
+import { CiMicrophoneOn } from "react-icons/ci";
 import "antd/dist/reset.css";
 import { Col, Row } from "antd";
 import TypingAnimation from "../../components/TypingAnimation";
 import jwtAxios from "../../services/jwt-auth";
-import { RECORD_MODE } from "../../constants/AppEnum";
+import { ACTION_TASK, RECORD_MODE } from "../../constants/AppEnum";
 import { BsRecordCircle, BsStopFill } from "react-icons/bs";
 import OptionTask from "../../components/OptionTask";
+import CustomCard from "../../components/CustomCard";
 
 const RecordFileTab = () => {
-  const [transcription, setTranscription] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [audioBlob, setAudioBlob] = useState<any>(null);
   const [audioURL, setAudioURL] = useState("");
+  const [translate, setTranslate] = useState("");
+  const [transcription, setTranscription] = useState("");
   const [languageTranslate, onChangeLanguageTranslate] = useState("en");
+  const audioChunksRef = useRef<Blob[]>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [recordMode, setRecordMode] = useState<RECORD_MODE>(
     RECORD_MODE.DEFAULT
   );
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const [actionTask, setActionTask] = useState<ACTION_TASK>(
+    ACTION_TASK.TRANSCRIBE
+  );
 
   const handleChangeRecordMode = (recordMode: RECORD_MODE) => {
     setRecordMode(recordMode);
@@ -44,14 +49,12 @@ const RecordFileTab = () => {
         audioChunksRef.current.push(event.data);
       };
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunks, { 'type': 'audio/ogg; codecs=opus' });
-        console.log("blob: ", blob);
+        // const blob = new Blob(chunks, { type: "audio/ogg; codecs=opus" });
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/wav",
         });
         const url = URL.createObjectURL(audioBlob);
         setAudioBlob(audioBlob);
-        console.log("audioBlob: ", audioBlob);
         setAudioURL(url);
         audioChunksRef.current = [];
       };
@@ -61,14 +64,14 @@ const RecordFileTab = () => {
     }
   };
 
-  const onChangeTask = (value: any) => {
-    console.log("radio checked", value);
-  };
-
   const handleSubmit = async () => {
     if (audioBlob) {
+      setIsLoading(true);
+      setTranscription("");
       const formData = new FormData();
       formData.append("audio", audioBlob);
+      actionTask === ACTION_TASK.TRANSLATE &&
+        formData.append("targetLanguage", languageTranslate);
       try {
         const response = await jwtAxios.post("/transcribe", formData, {
           headers: {
@@ -77,9 +80,13 @@ const RecordFileTab = () => {
         });
         if (response?.data) {
           setTranscription(response.data.transcription);
+          response?.data?.translate && setTranslate(response.data.translate);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log("error: ", error);
+        message.error(error?.message || "Something went wrong");
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -88,8 +95,7 @@ const RecordFileTab = () => {
     <>
       <Row gutter={24}>
         <Col flex={6}>
-          <Card>
-            Microphone <br />
+          <CustomCard icon={<CiMicrophoneOn size={18} />} label="Microphone">
             {recordMode === RECORD_MODE.DEFAULT && (
               <Button
                 className="sm secondary"
@@ -125,8 +131,12 @@ const RecordFileTab = () => {
                 </Button>
               </div>
             )}
-          </Card>
-          <OptionTask onChangeOption={onChangeLanguageTranslate} onChangeTask={onChangeTask} />
+          </CustomCard>
+
+          <OptionTask
+            onChangeOption={onChangeLanguageTranslate}
+            onChangeTask={setActionTask}
+          />
           <Card>
             <Button type="primary" onClick={handleSubmit}>
               Submit
@@ -135,10 +145,16 @@ const RecordFileTab = () => {
         </Col>
 
         <Col flex={6}>
-          <Card>
-            Output:
-            <TypingAnimation message={transcription} />
-          </Card>
+          <CustomCard label="Output:">
+            Transcribe:
+            <TypingAnimation isLoading={isLoading} message={transcription} />
+            {actionTask === ACTION_TASK.TRANSLATE && (
+              <>
+                Translate:
+                <TypingAnimation isLoading={isLoading} message={translate} />
+              </>
+            )}
+          </CustomCard>
         </Col>
       </Row>
     </>

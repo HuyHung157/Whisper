@@ -1,10 +1,14 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import numpy as np
+import os
+import torch
+import librosa
 import whisper
 import tempfile
-import os
-import pytube as pt
+import numpy as np
+import datetime
+import subprocess
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 # CORS(app,
@@ -15,11 +19,13 @@ CORS(
     app,
     resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}},
 )
+socketio = SocketIO(app, cors_allowed_origins="http://localhost:3000")
 
 # model = whisper.load_model("large-v3", "cpu")
-model = whisper.load_model("large")
+# model = whisper.load_model("large")
 # model = whisper.load_model("medium")
-# model = whisper.load_model("base")
+model = whisper.load_model("base")
+audio_buffer = b""
 
 
 @app.route("/")
@@ -30,7 +36,7 @@ def home():
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
     audio_file = request.files["audio"]
-    target_language = request.form.get('targetLanguage', '')
+    target_language = request.form.get("targetLanguage", "")
     try:
         with tempfile.NamedTemporaryFile(delete=False) as temp_audio_file:
             audio_file.save(temp_audio_file)
@@ -51,18 +57,80 @@ def transcribe():
         return jsonify({"error": "An error occurred during transcription"}), 500
 
 
+def download_audio(youtube_link):
+    audio_filename = "audio.mp3"
+    command = [
+        "yt-dlp",
+        "--extract-audio",
+        "--audio-format",
+        "mp3",
+        "--output",
+        audio_filename,
+        youtube_link,
+    ]
+    subprocess.run(command, check=True)
+    return audio_filename
+
+
+def transcribe_audio_from_youtube(youtube_link, target_language=None):
+    try:
+        audio_filename = download_audio(youtube_link)
+        if target_language:
+            result = model.transcribe(audio_filename)
+            translation_result = model.transcribe(
+                audio_filename, language=target_language
+            )
+        else:
+            result = model.transcribe(audio_filename)
+        os.remove(audio_filename)  # Clean up the downloaded file
+        return result["segments"], translation_result["segments"]
+    except Exception as e:
+        return str(e)
+
+
+def convert_to_srt(segments):
+    srt_content = ""
+    for i, segment in enumerate(segments):
+        start_time = str(datetime.timedelta(seconds=int(segment["start"])))
+        end_time = str(datetime.timedelta(seconds=int(segment["end"])))
+        text = segment["text"]
+        # srt_content += f"{i+1}\n{start_time},000 --> {end_time},000\n{text.strip()}\n\n"
+        srt_content += f"{start_time},000 --> {end_time},000\n{text.strip()}\n"
+    return srt_content
+
+
 @app.route("/transcript-youtube", methods=["POST"])
 def translate():
-    try:
-        # download mp3 from youtube video (Breaking Italy)
-        yt = pt.YouTube("https://www.youtube.com/watch?v=4KI9BBW_aP8")
-        stream = yt.streams.filter(only_audio=True)[0]
-        stream.download(filename="audio_italian.mp3")
-        result = model.transcribe("audio_italian.mp3")
-        transcription = result["text"]
-    except Exception as ex:
-        print(f"Exception - translate: {ex}")
-        return jsonify({"error": "An error occurred during translate"}), 500
+    # EN
+    # https://www.youtube.com/watch?v=ry9SYnV3svc
+    # JA
+    # https://www.youtube.com/watch?v=qzzweIQoIOU
+    data = request.get_json()
+    youtube_link = data["youtubeUrl"]
+    target_language = data.get("targetLanguage", "")
+    if youtube_link:
+        try:
+            segments, translation_segments = transcribe_audio_from_youtube(
+                youtube_link, target_language
+            )
+            if isinstance(segments, str):
+                return (
+                    jsonify({"error": segments}),
+                    500,
+                )  # Return error if transcription failed
+            srt_content = convert_to_srt(segments)
+            srt_translate = convert_to_srt(translation_segments)
+            response = jsonify({"transcription": srt_content})
+            if target_language == "en":
+                response = jsonify(
+                    {"transcription": srt_content, "translate": srt_translate}
+                )
+            return response
+        except Exception as ex:
+            print(f"Exception - translate: {ex}")
+            return jsonify({"error": "An error occurred during translate"}), 500
+
+    return jsonify({"error": "No YouTube link provided"}), 400
 
 
 @app.route("/speech_to_text", methods=["POST"])
@@ -86,5 +154,59 @@ def detect_language():
     return jsonify({"language": language})
 
 
+@socketio.on("connect")
+def handle_connect():
+    print("Client connected")
+
+
+@socketio.on("disconnect")
+def handle_disconnect():
+    print("Client disconnected")
+
+
+@socketio.on("audio_stream")
+def handle_audio_stream(data):
+    global audio_buffer
+    audio_buffer += data
+
+    # Define the element size for int16
+    element_size = np.dtype(np.int16).itemsize
+
+    # Check if the buffer has enough data for at least one element
+    if len(audio_buffer) >= element_size:
+        # Ensure buffer size is a multiple of element size
+        num_elements = len(audio_buffer) // element_size
+        buffer_size = num_elements * element_size
+
+        # Extract the data that fits the buffer size
+        audio_data = (
+            np.frombuffer(audio_buffer[:buffer_size], dtype=np.int16).astype(np.float32)
+            / 32768.0
+        )
+
+        # Keep the remaining data in the buffer
+        audio_buffer = audio_buffer[buffer_size:]
+
+        # Process the audio data
+        mel = log_mel_spectrogram(audio_data)
+        if mel.ndim == 2:  # Check if mel is 2-dimensional
+            mel_tensor = torch.from_numpy(mel).unsqueeze(
+                0
+            )  # Convert to tensor and add batch dimension
+        else:
+            mel_tensor = torch.from_numpy(mel)
+        result = model.decode(mel_tensor)
+        emit("transcription_result", {"text": result["text"]})
+
+
+def log_mel_spectrogram(audio_data, sr=16000, n_mels=80, n_fft=400, hop_length=160):
+    mel_spectrogram = librosa.feature.melspectrogram(
+        y=audio_data, sr=sr, n_mels=n_mels, n_fft=n_fft, hop_length=hop_length
+    )
+    log_mel_spectrogram = librosa.power_to_db(mel_spectrogram, ref=np.max)
+    return log_mel_spectrogram
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    # app.run(debug=True)
+    socketio.run(app, port=5000)
