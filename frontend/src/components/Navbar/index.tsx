@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Layout, Menu } from "antd";
-import {
-  MdOutlineFindInPage,
-  MdRecordVoiceOver,
-  MdTextsms,
-} from "react-icons/md";
+import { MdRecordVoiceOver, MdOutlineTextsms } from "react-icons/md";
 import { HiOutlineWrenchScrewdriver } from "react-icons/hi2";
 import "antd/dist/reset.css";
 import "./Navbar.css";
@@ -26,9 +22,6 @@ const Navbar = () => {
       case APP_ROUTES.TEXT_TO_SPEECH:
         setActiveTab(APP_ROUTES.TEXT_TO_SPEECH);
         break;
-      case APP_ROUTES.DETECT_LANGUAGE:
-        setActiveTab(APP_ROUTES.DETECT_LANGUAGE);
-        break;
       case APP_ROUTES.FINE_TUNNING:
         setActiveTab(APP_ROUTES.FINE_TUNNING);
         break;
@@ -48,7 +41,8 @@ const Navbar = () => {
         theme="light"
         className=""
         mode="horizontal"
-        onClick={handleClick} selectedKeys={[activeTab]}
+        onClick={handleClick}
+        selectedKeys={[activeTab]}
         defaultSelectedKeys={[`${APP_ROUTES.SPEECH_TO_TEXT}`]}
       >
         <Menu.Item
@@ -61,16 +55,9 @@ const Navbar = () => {
         <Menu.Item
           className="flex align-middle"
           key={APP_ROUTES.TEXT_TO_SPEECH}
-          icon={<MdTextsms size={20} />}
+          icon={<MdOutlineTextsms size={20} />}
         >
           <Link to={APP_ROUTES.TEXT_TO_SPEECH}>Text to Speech</Link>
-        </Menu.Item>
-        <Menu.Item
-          className="flex align-middle"
-          key={APP_ROUTES.DETECT_LANGUAGE}
-          icon={<MdOutlineFindInPage size={20} />}
-        >
-          <Link to={APP_ROUTES.DETECT_LANGUAGE}>Language Detection</Link>
         </Menu.Item>
         <Menu.Item
           className="flex align-middle"
@@ -80,7 +67,6 @@ const Navbar = () => {
           <Link to={APP_ROUTES.FINE_TUNNING}> Fine-tunning</Link>
         </Menu.Item>
       </Menu>
-
     </Header>
   );
 };

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Button, Card, Col, message, Row, Upload } from "antd";
+import React, { useEffect, useState } from "react";
+import { Button, Card, Col, message, Row, Select, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { BsFileEarmarkMusic } from "react-icons/bs";
 import TypingAnimation from "../../components/TypingAnimation";
@@ -8,6 +8,7 @@ import OptionTask from "../../components/OptionTask";
 import { ACTION_TASK } from "../../constants/AppEnum";
 import CustomCard from "../../components/CustomCard";
 import "antd/dist/reset.css";
+import { getSingleOption } from "src/utils/language";
 
 const { Dragger } = Upload;
 
@@ -15,7 +16,9 @@ const InputFileTab = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [translate, setTranslate] = useState("");
   const [transcription, setTranscription] = useState("");
-  const [languageTranslate, onChangeLanguageTranslate] = useState("en");
+  const [languageTranslate, setLanguageTranslate] = useState("en");
+  const [languageDetection, setLanguageDetection] = useState("");
+  const [languageOptions, setLanguageOptions] = useState<any>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [actionTask, setActionTask] = useState<ACTION_TASK>(
     ACTION_TASK.TRANSCRIBE
@@ -25,6 +28,7 @@ const InputFileTab = () => {
     if (audioFile) {
       setIsLoading(true);
       setTranscription("");
+      setLanguageDetection("");
       const formData = new FormData();
       formData.append("audio", audioFile);
       actionTask === ACTION_TASK.TRANSLATE &&
@@ -38,6 +42,8 @@ const InputFileTab = () => {
         if (response?.data) {
           setTranscription(response.data.transcription);
           response?.data?.translate && setTranslate(response.data.translate);
+          response?.data?.language &&
+            setLanguageDetection(response.data.language);
         }
       } catch (error: any) {
         console.log("error: ", error);
@@ -47,6 +53,13 @@ const InputFileTab = () => {
       }
     }
   };
+
+  useEffect(() => {
+    const options = getSingleOption(languageDetection);
+    if (options && options.length > 0) {
+      setLanguageOptions(options);
+    }
+  }, [languageDetection]);
 
   return (
     <>
@@ -82,7 +95,7 @@ const InputFileTab = () => {
           </CustomCard>
 
           <OptionTask
-            onChangeOption={onChangeLanguageTranslate}
+            onChangeOption={setLanguageTranslate}
             onChangeTask={setActionTask}
           />
           <Card>
@@ -93,7 +106,19 @@ const InputFileTab = () => {
         </Col>
 
         <Col flex={6}>
-        <CustomCard label="Output:">
+          <CustomCard label="Output:">
+            {languageDetection && languageOptions && (
+              <>
+                Language Detection:
+                <Select
+                  className="ml-3 min-w-36"
+                  options={languageOptions}
+                  defaultValue={languageDetection}
+                  disabled
+                />
+                <br />
+              </>
+            )}
             Transcribe:
             <TypingAnimation isLoading={isLoading} message={transcription} />
             {actionTask === ACTION_TASK.TRANSLATE && (

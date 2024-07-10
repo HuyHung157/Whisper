@@ -6,7 +6,7 @@ numpy
 torch
 yt-dlp
 librosa
-ffmpeg-python==0.2.0
+ffmpeg-python
 
 # For GPU
 git+https://github.com/openai/whisper.git

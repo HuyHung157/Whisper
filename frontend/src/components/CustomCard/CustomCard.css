@@ -1,9 +1,9 @@
 .ant-tabs .ant-tabs-nav {
   margin-bottom: 0;
 }
-.ant-tabs-content-holder{
-  border: 1px solid #f0f0f0;
-  border-radius: 0 0 8px 8px;
+.ant-tabs-content-holder {
+  border: 1px solid #ecebeb;
+  border-radius: 0 8px 8px 8px;
   border-top: unset;
   padding: 16px;
 }
@@ -18,7 +18,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  background-color: transparent;
+  background-color: #f5f5f56c;
   color: #727272;
   border: 1px dashed #e3e3e3;
   border-width: 0 1px 1px 0;

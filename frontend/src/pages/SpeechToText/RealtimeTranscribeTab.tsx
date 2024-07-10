@@ -9,18 +9,20 @@ import { ACTION_TASK, RECORD_MODE } from "../../constants/AppEnum";
 import { BsRecordCircle, BsStopFill } from "react-icons/bs";
 import OptionTask from "../../components/OptionTask";
 import CustomCard from "../../components/CustomCard";
-import io from "socket.io-client";
+import { Socket, io } from "socket.io-client";
 
 // 'http://localhost:5000'
 const socket = io(`${process.env.REACT_APP_API_URL}`);
 
 const RealtimeTranscribeTab = () => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [audioBlob, setAudioBlob] = useState<any>(null);
 
   const [translate, setTranslate] = useState("");
   const [transcription, setTranscription] = useState("");
-  const [languageTranslate, onChangeLanguageTranslate] = useState("en");
+  const [languageTranslate, setLanguageTranslate] = useState("en");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -31,22 +33,51 @@ const RealtimeTranscribeTab = () => {
   );
 
   useEffect(() => {
-    socket.on("connect", () => {
-      console.log("Connected to server");
+    const newSocket = io(`${process.env.REACT_APP__WS_SERVER_URL}`, {
+      reconnection: true,
+      reconnectionAttempts: Number(
+        process.env.REACT_APP__WS_MAX_RECONNECT_ATTEMPTS
+      ),
+      timeout: Number(process.env.REACT_APP__WS_TIMEOUT), // 10 seconds timeout for reconnect attempts
     });
 
-    socket.on("disconnect", () => {
-      console.log("Disconnected from server");
+    newSocket.on("connect", () => {
+      console.log("Connected to WS server");
+      setSocket(newSocket);
+      setReconnectAttempts(0);
     });
 
-    socket.on("transcription_result", (data) => {
-      setTranscription((prev) => prev + data.text + " ");
+    newSocket.on("disconnect", () => {
+      console.log("Disconnected from WS server");
+    });
+
+    newSocket.on(
+      "audio_response",
+      (data: { transcription?: string; error?: string }) => {
+        if (data.transcription) {
+          console.log("Transcription:", data.transcription);
+          // Handle transcription response here (update UI, etc.)
+          message.info(data.transcription);
+        } else if (data.error) {
+          console.error("Error:", data.error);
+          // Handle error response (display error message, etc.)
+          message.error("Error occurred during transcription");
+        }
+      }
+    );
+
+    newSocket.on("reconnect_attempt", () => {
+      console.log("Attempting to reconnect...");
+      setReconnectAttempts((prevAttempts) => prevAttempts + 1);
+    });
+
+    newSocket.on("reconnect_failed", () => {
+      console.log("Reconnection attempts exhausted.");
+      setReconnectAttempts(0);
     });
 
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("transcription_result");
+      newSocket.disconnect();
     };
   }, []);
 
@@ -56,74 +87,52 @@ const RealtimeTranscribeTab = () => {
       startRecording();
     }
     if (recordMode === RECORD_MODE.STOP) {
-      mediaRecorderRef.current && mediaRecorderRef.current.stop();
+      stopRecording();
     }
   };
 
-  const startRecording = async () => {
-    try {
-      navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((stream) => {
-          const mediaRecorder = new MediaRecorder(stream);
-          mediaRecorderRef.current = mediaRecorder;
-          audioChunksRef.current = [];
+  const startRecording = () => {
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        const audioChunks: Blob[] = [];
+        const mediaRecorder = new MediaRecorder(stream);
 
-          mediaRecorder.ondataavailable = (event: BlobEvent) => {
-            audioChunksRef.current.push(event.data);
-            if (mediaRecorder.state === "recording") {
-              mediaRecorder.requestData();
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+          // Convert audio blob to base64 to send over socket
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            const audioBase64 = reader.result?.toString().split(",")[1]; // Extract base64 data
+            if (socket) {
+              socket.emit("audio", { audio_base64: audioBase64 });
             }
           };
-
-          mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunksRef.current, {
-              type: "audio/wav",
-            });
-            audioChunksRef.current = [];
-            const reader = new FileReader();
-            reader.onload = () => {
-              const buffer = reader.result;
-              socket.emit("audio_stream", buffer);
-            };
-            reader.readAsArrayBuffer(audioBlob);
-          };
-          mediaRecorder.start();
-        })
-        .catch((error) => {
-          console.error("Error accessing media devices.", error);
-        });
-    } catch (err) {
-      console.error("Something wrong: ", err);
-    }
+        };
+        mediaRecorder.start();
+      })
+      .catch((error) => {
+        console.error("Error starting recording:", error);
+      });
   };
 
-  // const handleSubmit = async () => {
-  //   if (audioBlob) {
-  //     setIsLoading(true);
-  //     setTranscription("");
-  //     const formData = new FormData();
-  //     formData.append("audio", audioBlob);
-  //     actionTask === ACTION_TASK.TRANSLATE &&
-  //       formData.append("targetLanguage", languageTranslate);
-  //     try {
-  //       const response = await jwtAxios.post("/transcribe", formData, {
-  //         headers: {
-  //           "Content-Type": "multipart/form-data",
-  //         },
-  //       });
-  //       if (response?.data) {
-  //         setTranscription(response.data.transcription);
-  //         response?.data?.translate && setTranslate(response.data.translate);
-  //       }
-  //     } catch (error: any) {
-  //       console.log("error: ", error);
-  //       message.error(error?.message || "Something went wrong");
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   }
-  // };
+  const stopRecording = () => {
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+      })
+      .catch((error) => {
+        console.error("Error stopping recording:", error);
+      });
+  };
 
   return (
     <>
@@ -151,7 +160,7 @@ const RealtimeTranscribeTab = () => {
           </CustomCard>
 
           <OptionTask
-            onChangeOption={onChangeLanguageTranslate}
+            onChangeOption={setLanguageTranslate}
             onChangeTask={setActionTask}
           />
           {/* <Card>
@@ -163,6 +172,12 @@ const RealtimeTranscribeTab = () => {
 
         <Col flex={6}>
           <CustomCard label="Output:">
+            {reconnectAttempts > 0 && (
+              <p className="mt-4">
+                Reconnecting ({reconnectAttempts} /{" "}
+                {process.env.REACT_APP__WS_MAX_RECONNECT_ATTEMPTS})
+              </p>
+            )}
             Transcribe:
             <TypingAnimation isLoading={isLoading} message={transcription} />
             {actionTask === ACTION_TASK.TRANSLATE && (

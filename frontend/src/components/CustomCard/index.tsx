@@ -1,5 +1,6 @@
 import React, { ReactNode } from "react";
-import { Card, Input, Skeleton } from "antd";
+import { Card } from "antd";
+import "./CustomCard.css";
 
 interface CustomCardProps {
   label: string;
@@ -11,9 +12,9 @@ const CustomCard = ({ icon, label, children }: CustomCardProps) => {
   return (
     <>
       <div className="card-container">
-        <div className="flex align-middle top-left-label">
+        <div className="flex items-center h-8 p-1 px-5 top-left-label ">
           {icon && icon}
-          <span className="ml-5">{label}</span>
+          <span className="ml-1">{label}</span>
         </div>
         <Card>{children}</Card>
       </div>

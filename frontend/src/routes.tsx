@@ -1,7 +1,6 @@
 import React from 'react';
 import { createBrowserRouter } from "react-router-dom";
 import SpeechToText from "./pages/SpeechToText";
-import LanguageDetection from "./pages/LanguageDetection";
 import TextToSpeech from "./pages/TextToSpeech";
 import AppLayout from "./components/AppLayout";
 import NotFound from './pages/NotFound';
@@ -22,10 +21,6 @@ export const router = createBrowserRouter([
       {
         path: "text-to-speech",
         element: <TextToSpeech />,
-      },
-      {
-        path: "detect-language",
-        element: <LanguageDetection />,
       },
       {
         path: "*",

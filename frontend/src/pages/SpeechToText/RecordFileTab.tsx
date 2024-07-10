@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { Button, Card, message } from "antd";
+import React, { useEffect, useRef, useState } from "react";
+import { Button, Card, message, Select } from "antd";
 import { CiMicrophoneOn } from "react-icons/ci";
 import "antd/dist/reset.css";
 import { Col, Row } from "antd";
@@ -9,6 +9,7 @@ import { ACTION_TASK, RECORD_MODE } from "../../constants/AppEnum";
 import { BsRecordCircle, BsStopFill } from "react-icons/bs";
 import OptionTask from "../../components/OptionTask";
 import CustomCard from "../../components/CustomCard";
+import { getSingleOption } from "src/utils/language";
 
 const RecordFileTab = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +17,9 @@ const RecordFileTab = () => {
   const [audioURL, setAudioURL] = useState("");
   const [translate, setTranslate] = useState("");
   const [transcription, setTranscription] = useState("");
-  const [languageTranslate, onChangeLanguageTranslate] = useState("en");
+  const [languageTranslate, setLanguageTranslate] = useState("en");
+  const [languageDetection, setLanguageDetection] = useState("");
+  const [languageOptions, setLanguageOptions] = useState<any>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [recordMode, setRecordMode] = useState<RECORD_MODE>(
@@ -37,6 +40,13 @@ const RecordFileTab = () => {
       setAudioURL("");
     }
   };
+
+  useEffect(() => {
+    const options = getSingleOption(languageDetection);
+    if (options && options.length > 0) {
+      setLanguageOptions(options);
+    }
+  }, [languageDetection]);
 
   const startRecording = async () => {
     try {
@@ -81,6 +91,8 @@ const RecordFileTab = () => {
         if (response?.data) {
           setTranscription(response.data.transcription);
           response?.data?.translate && setTranslate(response.data.translate);
+          response?.data?.language &&
+            setLanguageDetection(response.data.language);
         }
       } catch (error: any) {
         console.log("error: ", error);
@@ -115,7 +127,7 @@ const RecordFileTab = () => {
               </Button>
             )}
             {recordMode === RECORD_MODE.STOP && (
-              <div className="flex align-middle">
+              <div className="flex items-center">
                 {!audioURL && <audio controls src={""}></audio>}
                 {audioURL && (
                   <audio controls>
@@ -134,7 +146,7 @@ const RecordFileTab = () => {
           </CustomCard>
 
           <OptionTask
-            onChangeOption={onChangeLanguageTranslate}
+            onChangeOption={setLanguageTranslate}
             onChangeTask={setActionTask}
           />
           <Card>
@@ -146,6 +158,18 @@ const RecordFileTab = () => {
 
         <Col flex={6}>
           <CustomCard label="Output:">
+            {languageDetection && languageOptions && (
+              <>
+                Language Detection:
+                <Select
+                  className="ml-3 min-w-36"
+                  options={languageOptions}
+                  defaultValue={languageDetection}
+                  disabled
+                />
+                <br />
+              </>
+            )}
             Transcribe:
             <TypingAnimation isLoading={isLoading} message={transcription} />
             {actionTask === ACTION_TASK.TRANSLATE && (

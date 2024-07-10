@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { Card, Radio, RadioChangeEvent, Select } from "antd";
 import "antd/dist/reset.css";
 import { ACTION_TASK } from "../constants/AppEnum";
+import data from "src/languages.json";
 
 const options = [
   { label: "Transcribe", value: ACTION_TASK.TRANSCRIBE },
@@ -30,10 +31,11 @@ const OptionTask = ({
   };
 
   useEffect(() => {
-    fetch("/languages.json")
-      .then((response) => response.json())
-      .then((data) => setLanguages(data.languages))
-      .catch((error) => console.error("Error fetching the JSON data:", error));
+    setLanguages(data.languages)
+    // fetch("/languages.json")
+    //   .then((response) => response.json())
+    //   .then((data) => setLanguages(data.languages))
+    //   .catch((error) => console.error("Error fetching the JSON data:", error));
   }, []);
 
   return (

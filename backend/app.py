@@ -1,31 +1,27 @@
 import os
-import torch
-import librosa
 import whisper
 import tempfile
 import numpy as np
 import datetime
 import subprocess
+import base64
+import asyncio
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
+
 
 app = Flask(__name__)
-# CORS(app,
-#      origins=["http://localhost:3000"],
-#      methods=["POST"]
-# )
 CORS(
     app,
     resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}},
 )
-socketio = SocketIO(app, cors_allowed_origins="http://localhost:3000")
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # model = whisper.load_model("large-v3", "cpu")
 # model = whisper.load_model("large")
 # model = whisper.load_model("medium")
 model = whisper.load_model("base")
-audio_buffer = []
 
 
 @app.route("/")
@@ -42,16 +38,23 @@ def transcribe():
             audio_file.save(temp_audio_file)
             temp_audio_file_path = temp_audio_file.name
             result = model.transcribe(temp_audio_file_path)
+            language = result["language"]
         if target_language:
             output = model.transcribe(temp_audio_file_path, language=target_language)
             translate = output["text"]
             transcription = result["text"]
             os.remove(temp_audio_file_path)
-            return jsonify({"transcription": transcription, "translate": translate})
+            return jsonify(
+                {
+                    "transcription": transcription,
+                    "translate": translate,
+                    "language": language,
+                }
+            )
         else:
             transcription = result["text"]
             os.remove(temp_audio_file_path)
-            return jsonify({"transcription": transcription})
+            return jsonify({"transcription": transcription, "language": language})
     except Exception as ex:
         print(f"Exception - transcription: {ex}")
         return jsonify({"error": "An error occurred during transcription"}), 500
@@ -163,38 +166,37 @@ def handle_connect():
 def handle_disconnect():
     print("Client disconnected")
 
-@socketio.on("audio_stream")
-def handle_audio_stream(data):
-    global audio_buffer
-    # Convert the received data into a numpy array of int16
-    audio_data = np.frombuffer(data, dtype=np.int16)
-    # Normalize the audio data to float32 and store in audio_buffer
-    audio_buffer.extend(audio_data.astype(np.float32) / 32768.0)
+
+@socketio.on("audio")
+def handle_audio(audio_data):
+    try:
+        audio_base64 = audio_data["audio_base64"]
+        audio_bytes = base64.b64decode(audio_base64)
+        # Example: Perform audio processing (transcription)
+        transcription_result = transcribe_audio(audio_bytes)
+        # Emit transcription result back to the client
+        socketio.emit("audio_response", {"transcription": transcription_result})
+    except Exception as e:
+        print(f"Error handling audio data: {e}")
+        socketio.emit("audio_response", {"error": str(e)})
+
+
+def transcribe_audio(audio_bytes):
+    # Example: Simulated transcription process (replace with your actual logic)
+    # In a real application, you would use a suitable library (e.g., Google Speech-to-Text API, etc.)
     
-    # Process every second of audio (16000 samples at 16kHz)
-    if len(audio_buffer) >= 16000:
-        audio_data = np.array(audio_buffer[:16000])
-        audio_buffer = audio_buffer[16000:]
-        transcription = transcribe_audio_data(audio_data)
-        emit('transcription_result', {'text': transcription})
+    # Simulate some delay for processing (asyncio.sleep can be replaced with actual transcription logic)
+    asyncio.run(asyncio.sleep(2))
+    
+    # Convert bytes to numpy array (example: assume 16-bit PCM audio)
+    audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+    
+    # Example: Simple mock transcription (you should replace this with your actual logic)
+    transcription = f"Mock transcription: Audio length={len(audio_np)} samples"
+    
+    return transcription
 
-def transcribe_audio_data(audio_data):
-    mel = log_mel_spectrogram(audio_data)
-    mel_tensor = torch.from_numpy(mel).unsqueeze(0)
-    result = model.decode(mel_tensor)
-    return result['text']
-
-def log_mel_spectrogram(audio_data, sr=16000, n_mels=80, n_fft=400, hop_length=160):
-    mel_spectrogram = librosa.feature.melspectrogram(
-        y=audio_data, 
-        sr=sr, 
-        n_mels=n_mels, 
-        n_fft=n_fft, 
-        hop_length=hop_length
-    )
-    log_mel_spectrogram = librosa.power_to_db(mel_spectrogram, ref=np.max)
-    return log_mel_spectrogram
 
 if __name__ == "__main__":
     # app.run(debug=True)
-    socketio.run(app, port=5000)
+    socketio.run(app, port=5000, debug=True)
