@@ -3,16 +3,14 @@ import whisper
 import tempfile
 import numpy as np
 import datetime
-import time
 import subprocess
-import base64
-import asyncio
+import torch
+import librosa
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-from pydub import AudioSegment
-from io import BytesIO
 import sounddevice as sd
+import base64
 
 
 app = Flask(__name__)
@@ -27,7 +25,11 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # model = whisper.load_model("large")
 # model = whisper.load_model("medium")
 model = whisper.load_model("base")
-
+audio_buffer = np.array([], dtype=np.float32)
+# Parameters for real-time audio streaming
+samplerate = 16000
+blocksize = 4000
+stream = None
 
 @app.route("/")
 def home():
@@ -180,32 +182,61 @@ def handle_connect():
 def handle_disconnect():
     print("Client disconnected")
 
-
-@socketio.on("audio")
-def handle_audio(data):
-    audio_base64 = data["audio"]
-    audio_data = base64.b64decode(audio_base64.split(",")[1])
-    audio_path = save_audio(audio_data)
-
-    # Run transcription in a separate thread to avoid blocking SocketIO event loop
-    threading.Thread(target=process_audio, args=(audio_path,)).start()
-
-
-def save_audio(audio_data):
-    path = f"tmp/{time.time()}.webm"
+@socketio.on('audio_stream')
+def handle_audio_stream(audio_data):
     try:
-        with open(path, "wb") as f:
-            f.write(audio_data)
-        return path
+        # Decode base64 audio data if necessary
+        audio_bytes = base64.b64decode(audio_data)
+
+        # Calculate the number of elements in the array
+        num_elements = len(audio_bytes) // np.dtype(np.float32).itemsize
+
+        # Convert bytes to numpy array
+        audio_array = np.frombuffer(audio_bytes, dtype=np.float32, count=num_elements)
+
+        # Process audio data
+        mel = log_mel_spectrogram(audio_array)
+        if mel is not None:
+            # Perform transcription using Whisper model
+            with torch.no_grad():
+                result = model.transcribe(mel)
+
+            # Emit transcription result back to the frontend
+            emit('transcription_result', {'text': result['text']})
+        else:
+            raise ValueError("Failed to calculate log mel spectrogram")
+
     except Exception as e:
-        print(f"Error saving audio file: {e}")
+        print(f"Error processing audio stream: {e}")
+
+def log_mel_spectrogram(audio_data, sr=16000, n_mels=80, n_fft=400, hop_length=160):
+    try:
+        # Ensure audio_data is numpy array
+        if not isinstance(audio_data, np.ndarray):
+            raise ValueError("Audio data must be of type numpy.ndarray")
+
+        # Ensure audio_data is of the correct shape and type
+        if audio_data.dtype != np.float32:
+            audio_data = audio_data.astype(np.float32)
+
+        # Reshape audio_data if necessary
+        if audio_data.ndim > 1:
+            audio_data = np.squeeze(audio_data)
+
+        # Calculate Mel spectrogram
+        mel_spectrogram = librosa.feature.melspectrogram(
+            y=audio_data,
+            sr=sr,
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length
+        )
+        log_mel_spectrogram = librosa.power_to_db(mel_spectrogram, ref=np.max)
+        return log_mel_spectrogram
+
+    except Exception as e:
+        print(f"Error calculating log mel spectrogram: {e}")
         return None
-
-
-def process_audio(audio_path):
-    transcription = transcribe_audio(audio_path)
-    emit("transcription", {"text": transcription})
-
 
 if __name__ == "__main__":
     # app.run(debug=True)

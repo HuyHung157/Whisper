@@ -4,16 +4,14 @@ import io from "socket.io-client";
 import { BsRecordCircle, BsStopFill } from "react-icons/bs";
 import { RECORD_MODE } from "src/constants/AppEnum";
 import jwtAxios from "src/services/jwt-auth";
-import RecordRTC from "recordrtc";
 
-const socket = io("http://localhost:5000"); // Replace with your Flask server URL
+const socket = io("http://127.0.0.1:5000"); // Replace with your Flask server URL
 
 const RealtimeTesting: React.FC = () => {
   const [transcription, setTranscription] = useState<string>("");
   const [recordMode, setRecordMode] = useState<RECORD_MODE>(RECORD_MODE.STOP);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const [mediaRecorder, setMediaRecorder] = useState<RecordRTC | null>(null);
 
   useEffect(() => {
     socket.on("connect", () => {
@@ -24,8 +22,8 @@ const RealtimeTesting: React.FC = () => {
       console.log("Disconnected from WS server");
     });
 
-    socket.on("transcription", (data) => {
-      setTranscription((prev) => prev + " " + data.text);
+    socket.on("transcription_result", (data: any) => {
+      setTranscription((prev) => prev + data.text + " ");
     });
 
     getListDevice();
@@ -42,44 +40,54 @@ const RealtimeTesting: React.FC = () => {
   const handleChangeRecordMode = (recordMode: RECORD_MODE) => {
     setRecordMode(recordMode);
     if (recordMode === RECORD_MODE.START) {
-      handleStartRecording();
+      startRecording();
     }
     if (recordMode === RECORD_MODE.STOP) {
-      handleStopRecording();
+      stopRecording();
     }
   };
 
-  const handleStartRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new RecordRTC(stream, {
-      type: "audio",
-      mimeType: "audio/webm",
-    });
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorderRef.current = new MediaRecorder(stream);
+        audioChunksRef.current = [];
 
-    recorder.startRecording();
-    setMediaRecorder(recorder);
+        mediaRecorderRef.current.ondataavailable = event => {
+            audioChunksRef.current.push(event.data);
 
-    const interval = setInterval(() => {
-      if (mediaRecorder) {
-        mediaRecorder.getDataURL((dataURL: any) => {
-          console.log("dataURL:", dataURL);
+            // Process the audio data immediately or accumulate until stop
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (reader.result) {
+                    const audioBuffer = reader.result as ArrayBuffer;
 
-          socket.emit("audio", { audio: dataURL });
-        });
-      }
-    }, 1000);
-  };
+                    // Optionally, you may encode ArrayBuffer to base64 if needed
+                    // const base64Encoded = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
 
-  const handleStopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stopRecording(() => {
-        mediaRecorder.getDataURL((dataURL) => {
-          socket.emit("audio", { audio: dataURL });
-        });
-      });
-      setMediaRecorder(null);
+                    // Emit the audio data to the backend via Socket.IO
+                    socket.emit('audio_stream', audioBuffer);
+                }
+            };
+            reader.readAsArrayBuffer(audioBlob);
+        };
+
+        mediaRecorderRef.current.start(1000); // Capture audio every second
+
+      console.log("Recording started");
+  } catch (error) {
+      console.error('Error starting recording', error);
+  }
+};
+
+const stopRecording = async () => {
+    try {
+      mediaRecorderRef.current?.stop();
+    } catch (error) {
+        console.error('Error stopping recording', error);
     }
-  };
+};
 
   return (
     <div className="App">
