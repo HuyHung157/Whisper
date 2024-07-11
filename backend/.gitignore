@@ -2,5 +2,8 @@
 /include
 /lib
 /lib64
-/venv 
+/venv
+/myenv 
 /share
+/tmp
+/__pycache__

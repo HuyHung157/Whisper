@@ -6,7 +6,11 @@ numpy
 torch
 yt-dlp
 librosa
-ffmpeg-python
+ffmpeg-python==0.2.0
+ffmpeg
+#Replace
+pydub
+sounddevice >= 0.4.6
 
 # For GPU
 git+https://github.com/openai/whisper.git
@@ -19,3 +23,5 @@ git+https://github.com/openai/whisper.git
 
 # Add a line to run the setup.sh script
 # -e ./setup.sh
+
+# https://blog.finxter.com/fixed-modulenotfounderror-no-module-named-sounddevice/

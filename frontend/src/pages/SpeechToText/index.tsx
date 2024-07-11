@@ -6,6 +6,7 @@ import RecordFileTab from "./RecordFileTab";
 import InputYoutubeTab from "./InputYoutubeTab";
 import "./index.css";
 import RealtimeTranscribeTab from "./RealtimeTranscribeTab";
+import RealtimeTesting from "./RealtimeTesting";
 
 const { TabPane } = Tabs;
 
@@ -25,7 +26,8 @@ const Transcription = () => {
           <InputYoutubeTab />
         </TabPane>
         <TabPane tab="Realtime" key="4">
-          <RealtimeTranscribeTab />
+          {/* <RealtimeTranscribeTab /> */}
+          <RealtimeTesting/>
         </TabPane>
       </Tabs>
     </div>

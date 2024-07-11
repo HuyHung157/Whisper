@@ -9,6 +9,7 @@ brew install ffmpeg
 
 # Navigate to the backend directory.
 Create a virtual environment: python -m venv venv
+Create a virtual environment: python3 -m venv myenv
 
 # Activate the virtual environment:
 On Windows: venv\Scripts\activate

@@ -3,18 +3,23 @@ import whisper
 import tempfile
 import numpy as np
 import datetime
+import time
 import subprocess
 import base64
 import asyncio
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
+from pydub import AudioSegment
+from io import BytesIO
+import sounddevice as sd
 
 
 app = Flask(__name__)
 CORS(
     app,
-    resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}},
+    resources={
+        r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}},
 )
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -28,6 +33,21 @@ model = whisper.load_model("base")
 def home():
     return "Whisper Demo Backend"
 
+# get a list of valid input devices
+
+
+@app.route("/list-sound-device", methods=["GET"])
+def get_valid_input_devices():
+    valid_devices = []
+    devices = sd.query_devices()
+    hostapis = sd.query_hostapis()
+
+    for device in devices:
+        if device["max_input_channels"] > 0:
+            device["host_api_name"] = hostapis[device["hostapi"]]["name"]
+            valid_devices.append(device)
+    return valid_devices
+
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
@@ -40,7 +60,8 @@ def transcribe():
             result = model.transcribe(temp_audio_file_path)
             language = result["language"]
         if target_language:
-            output = model.transcribe(temp_audio_file_path, language=target_language)
+            output = model.transcribe(
+                temp_audio_file_path, language=target_language)
             translate = output["text"]
             transcription = result["text"]
             os.remove(temp_audio_file_path)
@@ -150,13 +171,6 @@ def text_to_speech():
     return jsonify({"audio": audio})
 
 
-@app.route("/detect_language", methods=["POST"])
-def detect_language():
-    text = request.json["text"]
-    language = model.detect_language(text)
-    return jsonify({"language": language})
-
-
 @socketio.on("connect")
 def handle_connect():
     print("Client connected")
@@ -168,33 +182,29 @@ def handle_disconnect():
 
 
 @socketio.on("audio")
-def handle_audio(audio_data):
+def handle_audio(data):
+    audio_base64 = data["audio"]
+    audio_data = base64.b64decode(audio_base64.split(",")[1])
+    audio_path = save_audio(audio_data)
+
+    # Run transcription in a separate thread to avoid blocking SocketIO event loop
+    threading.Thread(target=process_audio, args=(audio_path,)).start()
+
+
+def save_audio(audio_data):
+    path = f"tmp/{time.time()}.webm"
     try:
-        audio_base64 = audio_data["audio_base64"]
-        audio_bytes = base64.b64decode(audio_base64)
-        # Example: Perform audio processing (transcription)
-        transcription_result = transcribe_audio(audio_bytes)
-        # Emit transcription result back to the client
-        socketio.emit("audio_response", {"transcription": transcription_result})
+        with open(path, "wb") as f:
+            f.write(audio_data)
+        return path
     except Exception as e:
-        print(f"Error handling audio data: {e}")
-        socketio.emit("audio_response", {"error": str(e)})
+        print(f"Error saving audio file: {e}")
+        return None
 
 
-def transcribe_audio(audio_bytes):
-    # Example: Simulated transcription process (replace with your actual logic)
-    # In a real application, you would use a suitable library (e.g., Google Speech-to-Text API, etc.)
-    
-    # Simulate some delay for processing (asyncio.sleep can be replaced with actual transcription logic)
-    asyncio.run(asyncio.sleep(2))
-    
-    # Convert bytes to numpy array (example: assume 16-bit PCM audio)
-    audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
-    
-    # Example: Simple mock transcription (you should replace this with your actual logic)
-    transcription = f"Mock transcription: Audio length={len(audio_np)} samples"
-    
-    return transcription
+def process_audio(audio_path):
+    transcription = transcribe_audio(audio_path)
+    emit("transcription", {"text": transcription})
 
 
 if __name__ == "__main__":

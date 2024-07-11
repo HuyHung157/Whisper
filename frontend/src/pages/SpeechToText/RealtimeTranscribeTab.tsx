@@ -13,6 +13,13 @@ import { Socket, io } from "socket.io-client";
 
 // 'http://localhost:5000'
 const socket = io(`${process.env.REACT_APP_API_URL}`);
+const newSocket = io(`${process.env.REACT_APP__WS_SERVER_URL}`, {
+  reconnection: true,
+  reconnectionAttempts: Number(
+    process.env.REACT_APP__WS_MAX_RECONNECT_ATTEMPTS
+  ),
+  timeout: Number(process.env.REACT_APP__WS_TIMEOUT), // 10 seconds timeout for reconnect attempts
+});
 
 const RealtimeTranscribeTab = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -33,14 +40,6 @@ const RealtimeTranscribeTab = () => {
   );
 
   useEffect(() => {
-    const newSocket = io(`${process.env.REACT_APP__WS_SERVER_URL}`, {
-      reconnection: true,
-      reconnectionAttempts: Number(
-        process.env.REACT_APP__WS_MAX_RECONNECT_ATTEMPTS
-      ),
-      timeout: Number(process.env.REACT_APP__WS_TIMEOUT), // 10 seconds timeout for reconnect attempts
-    });
-
     newSocket.on("connect", () => {
       console.log("Connected to WS server");
       setSocket(newSocket);
@@ -49,6 +48,10 @@ const RealtimeTranscribeTab = () => {
 
     newSocket.on("disconnect", () => {
       console.log("Disconnected from WS server");
+    });
+
+    newSocket.on("transcription_result", (data: any) => {
+      setTranscription((prev) => prev + data.text + " ");
     });
 
     newSocket.on(
@@ -91,47 +94,34 @@ const RealtimeTranscribeTab = () => {
     }
   };
 
-  const startRecording = () => {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        const audioChunks: Blob[] = [];
-        const mediaRecorder = new MediaRecorder(stream);
-
-        mediaRecorder.ondataavailable = (event) => {
-          audioChunks.push(event.data);
-        };
-
-        mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-          // Convert audio blob to base64 to send over socket
-          const reader = new FileReader();
-          reader.readAsDataURL(audioBlob);
-          reader.onloadend = () => {
-            const audioBase64 = reader.result?.toString().split(",")[1]; // Extract base64 data
-            if (socket) {
-              socket.emit("audio", { audio_base64: audioBase64 });
-            }
-          };
-        };
-        mediaRecorder.start();
-      })
-      .catch((error) => {
-        console.error("Error starting recording:", error);
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm",
       });
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          event.data.arrayBuffer().then((buffer) => {
+            console.log("buffer: ", buffer);
+            newSocket.emit("audio_stream", buffer);
+          });
+        }
+      };
+
+      mediaRecorder.start(250); // Send audio chunks every 250ms
+      mediaRecorderRef.current = mediaRecorder;
+    } catch (error) {
+      console.error("Error accessing media devices.", error);
+    }
   };
 
   const stopRecording = () => {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        stream.getTracks().forEach((track) => {
-          track.stop();
-        });
-      })
-      .catch((error) => {
-        console.error("Error stopping recording:", error);
-      });
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
   };
 
   return (
