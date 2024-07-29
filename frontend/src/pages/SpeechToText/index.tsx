@@ -25,10 +25,10 @@ const Transcription = () => {
         <TabPane tab="Youtube" key="3">
           <InputYoutubeTab />
         </TabPane>
-        <TabPane tab="Realtime" key="4">
-          {/* <RealtimeTranscribeTab /> */}
+        {/* <TabPane tab="Realtime" key="4">
+          <RealtimeTranscribeTab />
           <RealtimeTesting/>
-        </TabPane>
+        </TabPane> */}
       </Tabs>
     </div>
   );

@@ -35,11 +35,14 @@ const InputYoutubeTab = () => {
     if (youtubeUrl) {
       setIsLoading(true);
       setTranscription("");
+      const payload: { youtubeUrl: string; targetLanguage?: string } = {
+        youtubeUrl,
+      };
+      if (actionTask === ACTION_TASK.TRANSLATE && languageTranslate) {
+        payload.targetLanguage = languageTranslate;
+      }
       try {
-        const response = await jwtAxios.post("/transcript-youtube", {
-          youtubeUrl,
-          targetLanguage: languageTranslate,
-        });
+        const response = await jwtAxios.post("/transcript-youtube", payload);
         if (response?.data) {
           setTranscription(response.data.transcription);
           response?.data?.translate && setTranslate(response.data.translate);

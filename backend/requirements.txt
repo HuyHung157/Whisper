@@ -9,7 +9,9 @@ librosa
 ffmpeg-python==0.2.0
 ffmpeg
 #Replace
+yt_dlp
 pydub
+pytube
 sounddevice >= 0.4.6
 
 # For GPU

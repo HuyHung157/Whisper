@@ -11,20 +11,21 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import sounddevice as sd
 import base64
+import uuid
+import yt_dlp
+from pytube import YouTube
 
 
 app = Flask(__name__)
 CORS(
-    app,
-    resources={
-        r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}},
+    app
 )
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # model = whisper.load_model("large-v3", "cpu")
 # model = whisper.load_model("large")
 # model = whisper.load_model("medium")
-model = whisper.load_model("base")
+model = whisper.load_model("medium")
 audio_buffer = np.array([], dtype=np.float32)
 # Parameters for real-time audio streaming
 samplerate = 16000
@@ -82,9 +83,62 @@ def transcribe():
         print(f"Exception - transcription: {ex}")
         return jsonify({"error": "An error occurred during transcription"}), 500
 
+def download_audio2(youtube_link):
+    try:
+        # Initialize YouTube object
+        yt = YouTube(youtube_link)
+        
+        # Filter streams to get only audio
+        audio_stream = yt.streams.filter(only_audio=True).first()
+        
+        # Define the output file path
+        output_path = audio_stream.download()
+        
+        # Correctly unpack the output path to base and extension
+        base, ext = os.path.splitext(output_path)
+        
+        # Ensure we are handling the correct number of elements
+        if not ext:  # If ext is empty, the unpacking may fail
+            raise ValueError("Invalid file extension")
+        
+        # Rename the file to have an .mp3 extension
+        audio_filename = base + '.mp3'
+        os.rename(output_path, audio_filename)
+        
+        return audio_filename
+    except Exception as e:
+        print(f"Exception - Error downloading audio: {e}")
+        return None
+
+
+def download_audio3(youtube_link):
+    try:
+        # Options for yt_dlp
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': '%(title)s.%(ext)s',  # Filename template
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+
+        # Download audio using yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(youtube_link, download=True)
+            audio_filename = ydl.prepare_filename(info_dict).replace('.webm', '.mp3').replace('.m4a', '.mp3')
+        
+        return audio_filename
+    except Exception as e:
+        print(f"Error downloading audio: {e}")
+        return None
+
 
 def download_audio(youtube_link):
-    audio_filename = "audio.mp3"
+    # Generate a unique filename based on UUID
+    audio_filename = f"audio_{uuid.uuid4().hex}.mp3"
+    
     command = [
         "yt-dlp",
         "--extract-audio",
@@ -94,13 +148,21 @@ def download_audio(youtube_link):
         audio_filename,
         youtube_link,
     ]
-    subprocess.run(command, check=True)
-    return audio_filename
+    
+    try:
+        # Run the command and capture the output
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        print(result.stdout)  # Print or log the command's output
+        return audio_filename
+    except subprocess.CalledProcessError as e:
+        print(f"Error downloading audio: {e}")
+        print(e.stderr)
+        return None
 
 
 def transcribe_audio_from_youtube(youtube_link, target_language=None):
     try:
-        audio_filename = download_audio(youtube_link)
+        audio_filename = download_audio3(youtube_link)
         if target_language:
             result = model.transcribe(audio_filename)
             translation_result = model.transcribe(
@@ -154,7 +216,7 @@ def translate():
             return response
         except Exception as ex:
             print(f"Exception - translate: {ex}")
-            return jsonify({"error": "An error occurred during translate"}), 500
+            return jsonify({"error": "An error occurred during transcription"}), 500
 
     return jsonify({"error": "No YouTube link provided"}), 400
 

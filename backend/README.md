@@ -4,10 +4,10 @@ sudo apt update && sudo apt install ffmpeg
 # on Arch Linux
 sudo pacman -S ffmpeg
 
-# on MacOS using Homebrew (https://brew.sh/)
+# on MacOS using Homebrew (https://brew.sh/):
 brew install ffmpeg
 
-# Navigate to the backend directory.
+# Navigate to the backend directory:
 Create a virtual environment: python -m venv venv
 Create a virtual environment: python3 -m venv myenv
 

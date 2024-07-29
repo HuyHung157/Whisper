@@ -19,12 +19,12 @@ const Navbar = () => {
       case APP_ROUTES.SPEECH_TO_TEXT:
         setActiveTab(APP_ROUTES.SPEECH_TO_TEXT);
         break;
-      case APP_ROUTES.TEXT_TO_SPEECH:
-        setActiveTab(APP_ROUTES.TEXT_TO_SPEECH);
-        break;
-      case APP_ROUTES.FINE_TUNNING:
-        setActiveTab(APP_ROUTES.FINE_TUNNING);
-        break;
+      // case APP_ROUTES.TEXT_TO_SPEECH:
+      //   setActiveTab(APP_ROUTES.TEXT_TO_SPEECH);
+      //   break;
+      // case APP_ROUTES.FINE_TUNNING:
+      //   setActiveTab(APP_ROUTES.FINE_TUNNING);
+      //   break;
       default:
         setActiveTab(APP_ROUTES.SPEECH_TO_TEXT);
         break;
@@ -52,7 +52,7 @@ const Navbar = () => {
         >
           <Link to={APP_ROUTES.SPEECH_TO_TEXT}>Speech to Text</Link>
         </Menu.Item>
-        <Menu.Item
+        {/* <Menu.Item
           className="flex align-middle"
           key={APP_ROUTES.TEXT_TO_SPEECH}
           icon={<MdOutlineTextsms size={20} />}
@@ -65,7 +65,7 @@ const Navbar = () => {
           icon={<HiOutlineWrenchScrewdriver size={20} />}
         >
           <Link to={APP_ROUTES.FINE_TUNNING}> Fine-tunning</Link>
-        </Menu.Item>
+        </Menu.Item> */}
       </Menu>
     </Header>
   );
